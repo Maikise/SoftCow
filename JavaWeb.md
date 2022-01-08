@@ -1,3 +1,5 @@
+[TOC]
+
 # 1、Java语言的学习
 
 ​	Java基础->流程控制->Java集合->JavaIO流->异常->多线程->网络编程->反射
@@ -546,15 +548,17 @@ synchronized (someObject){ //someObject 为 锁对象 -> 唯一
 >        ps.flush();//刷新
 >```
 
-- TCP通信服务端用的代表类
+- **TCP通信服务端用的代表类**
+  
   - ServerSocket类，注册端口；
   - 调用accept()方法阻塞等待接收客户端连接，得到Socket对象；
-
-- TCP通信的基本原理
+  
+- **TCP通信的基本原理**
+  
   - 客户端怎么发，服务端就应该怎么收；
   - 客户端如果没有消息，服务端会进入堵塞等待；
   - Socket一方关闭或者出现异常，对方Socket也会失效或者出错；
-
+  
 - 具体代码：
 
   ```java
@@ -694,9 +698,160 @@ public class ServerReaderRunnable implements Runnable {
 
 
 
+## 1.3反射
+
+>- 反射是在运行的时候获类的**字节码文件**对象：然后课解析**类中的全部成分**
+>- 反射的核心思想和关键就是：得到编译后的**class**文件对象
+>- 反射**可以破坏封装性**，私有的可以执行`con.setAccessible(true)`
+
+- 第一步：得到**class**对象：
+
+>```java 
+>//静态方法：forName(权限名：包名 + 类名 );
+>Class c1 = Class.forName("com.yxyl.reflect_class.Student");
+>```
+>
+>```java
+>Student c2 = new Student();
+>Class c3Class = c2.getClass();
+>```
+>
+>```java
+>Class c3 = Student.class;
+>```
 
 
 
+- 第二步：获取**Constructor**对象：
+
+
+>- 所有构造器
+>
+>```java
+>public Constructor<T> getDeclaredConstructor(类<?>) throws NoSuchMethodException, SecurityException
+>```
+
+>- 有参构造器
+>
+>```java
+>@Test
+>public void getConstructor() throws Exception {
+>    //1、获取类对象
+>    Class c = Student.class;
+>    //2、提取类中的有参构造器
+>    Constructor constructors = c.getDeclaredConstructor(int.class, String.class);
+>    System.out.println(constructors.getName() +//提取构造器名称
+>            "===>" +
+>            constructors.getParameterCount());//提取构造器参数个数
+>}
+>```
+
+- 第三步：创建类对象：
+
+>```java
+>@Test
+>public void getConstructor() throws Exception {
+>    //1、获取类对象
+>    Class c = Student.class;
+>    //2、提取类中的有参构造器
+>    Constructor constructor1 = c.getDeclaredConstructor();
+>    Student s1 = (Student) constructor1.newInstance();
+>    System.out.println(s1);
+>    
+>    System.out.println("-----------------");
+>
+>    Constructor constructor2 = c.getDeclaredConstructor(int.class, String.class);
+>    Student s2 = (Student) constructor2.newInstance(18,"yc");
+>    System.out.println(s2);
+>}
+>```
+
+- 成员变量对象
+
+>```java
+>@Test
+>public void getDeclaredField() throws Exception {
+>    //反射第一步，获取类对象
+>    Class c = Student.class;
+>    //提取某个成员变量
+>    Field f = c.getDeclaredField("age");
+>    //设置权限，暴力打开
+>    f.setAccessible(true);
+>    //创建对象
+>    Student s = new Student();
+>    //赋值
+>    f.set(s, 19);.//s.setAge(19)
+>    System.out.println(s);
+>    //取值
+>    int age = (int) f.get(s);
+>    System.out.println(age);
+>}
+>```
+
+- 成员方法的提取
+
+>```java
+>@Test
+>public void getDeclaredMethod() throws Exception {
+>    Class c = Dog.class;
+>
+>    //提取每个方法
+>    Method m1 = c.getDeclaredMethod("eat");
+>    Method m2 = c.getDeclaredMethod("eat", String.class);
+>    //暴力~~
+>    m1.setAccessible(true);
+>    m2.setAccessible(true);
+>    //触发方法的执行
+>    Dog d = new Dog();
+>    //方法若是没有结果回来的，那么返回的是null
+>    Object result1 = m1.invoke(d);
+>    System.out.println(result1);
+>
+>    System.out.println("===========");
+>
+>    Object result2 = m2.invoke(d,"shit");
+>    System.out.println(result2);
+>}
+>```
+
+
+
+### 1.3.1反射的作用
+
+- **绕过编译阶段为集合添加数据(给泛型的集合存入其他类型的数据)**
+
+  - **编译成Class文件进入运行阶段**的时候，**泛型会自动擦除**；
+
+  - 反射是作用在运行时候的技术，此时已经不存在泛型；
+
+  - ```java
+    public static void main(String[] args) throws Exception {
+        ArrayList<String> list1 = new ArrayList<>();//String类型的集合
+        ArrayList<Integer> list2 = new ArrayList<>();//Integer类型的集合
+    
+        System.out.println(list1.getClass());
+        System.out.println(list2.getClass());
+    
+        System.out.println(list1.getClass() == list2.getClass());
+    
+        System.out.println("===============");
+    
+        ArrayList<Integer> list3 = new ArrayList<>();
+        list3.add(23);
+        list3.add(24);
+        //list3.add("妖邪有泪");
+    
+        Class c = list3.getClass();
+        //定位add()方法
+        Method add = c.getDeclaredMethod("add", Object.class);
+        
+        boolean res = (boolean) add.invoke(list3, "妖邪有泪");
+        System.out.println(res);
+        System.out.println(list3);
+    }
+    ```
+
+- **通用框架的底层原理**
 
 
 
@@ -744,4 +899,6 @@ public class ServerReaderRunnable implements Runnable {
 
 
 
+
+<img src="E:/%E8%BD%AF%E5%B7%A5%E7%89%9B/%E5%AD%A6%E4%B9%A0%E8%B7%AF%E7%BA%BF.png" alt="学习路线"  />
 
