@@ -275,13 +275,21 @@ synchronized (someObject){ //someObject 为 锁对象 -> 唯一
 >**如何丢入线程池(如何处理Runnable任务)：**
 >
 >```java
-> ExecutorService pool = new ThreadPoolExecutor(3,5,6,
->                TimeUnit.SECONDS,new ArrayBlockingQueue<>(5),
->                new ThreadPoolExecutor.AbortPolicy());
+>  // 使用静态变量记住一个线程池对象
+>private static ExecutorService pool = new ThreadPoolExecutor(3, 5, 6, TimeUnit.SECONDS,
+>        new ArrayBlockingQueue<>(2),
+>        Executors.defaultThreadFactory(),
+>        new ThreadPoolExecutor.AbortPolicy());
+>```
 >
-> Runnable target = new MyRunnable();
+>```java
+>ExecutorService pool = new ThreadPoolExecutor(3,5,6,
+>           TimeUnit.SECONDS,new ArrayBlockingQueue<>(5),
+>           new ThreadPoolExecutor.AbortPolicy());
 >
-> pool.execute(target);// pool 的 execute 方法
+>Runnable target = new MyRunnable();
+>
+>pool.execute(target);// pool 的 execute 方法
 >```
 
 >**如何关闭线程池：**
@@ -468,15 +476,221 @@ synchronized (someObject){ //someObject 为 锁对象 -> 唯一
 >**传输层的2个常见协议：**
 >
 >- **TCP(传输控制协议)**
->  - 面向连接，可靠通信
->  - 三次握手
->  - 大量数据
->  - 需确认完毕
+>   - 面向连接，可靠通信
+>   - 三次握手
+>   - 大量数据
+>   - 需确认完毕
 >- **UDP(用户数据包协议)**
->  -  无连接，不可靠
->  - 将数据源IP、目的地IP和端口封装成数据包
->  - 每个数据包大小限制在64kb以内
->  - 可以广播发送(群发)，无需释放资源、开销小、速度快
+>   - 无连接，不可靠
+>   - 将数据源IP、目的地IP和端口封装成数据包
+>   - 每个数据包大小限制在64kb以内
+>   - 可以广播发送(群发)，无需释放资源、开销小、速度快
+
+#### 		1.2.3.1 **UDP**
+
+>1. **UDP发送端和接收端的对象是哪个：**
+>
+>   ```java
+>   public DatagramSocket();//创建发送端的Socket对象
+>   public DatagramSocket(int port);//创建接收端的Socket对象
+>   ```
+>
+>2. **数据包对象是哪个：**
+>
+>   - DatagramPacket
+>
+>3. **如何发送、接收数据包**
+>
+>   - ​	使用DatagramSocket的如下方法：
+>
+>     ```java
+>     public void send(DatagramPAcket dp);//发送数据包
+>     public void receive(DatagramPacket dp);//接收数据包
+>     ```
+
+>**UDP如何实现广播(群发)**
+>
+>- 使用广播地址：255.255.255.255
+>
+>- 具体操作：
+>
+>   1. **发送端**发送的数据包的目的地写的是广播地址、且指定端口。(255.255.255.255，9999)
+>
+>   2. 本机所在的网段的**其他主机**的程序只要**匹配端口成功**即可以**收到**消息了
+
+#### 		1.2.3.2 **TCP**
+
+- **客户端：**
+
+>**客户端创建管道：**
+>
+>```java
+>public Socket(String host, int port) throws UnknownHostException, IOException
+>    //创建一个流套接字并将其连接到指定主机上的指定端口号。
+>```
+>
+>**客户端开发：**
+>
+>```java
+>    //1、创建Socket通信管道请求服务器的连接
+>        Socket socket = new Socket("127.0.0.1", 7777);
+>
+>        //2、从socket通信管道中得到一个字节输出流得到数据
+>        OutputStream os = socket.getOutputStream();
+>
+>        //3、把低级的字节流包装成打印流
+>        PrintStream ps = new PrintStream(os);
+>
+>        //4、发送消息
+>        ps.print("我是TCP的客户端，我已经与你对接，并发出邀请：约吗？");
+>        ps.flush();//刷新
+>```
+
+- TCP通信服务端用的代表类
+  - ServerSocket类，注册端口；
+  - 调用accept()方法阻塞等待接收客户端连接，得到Socket对象；
+
+- TCP通信的基本原理
+  - 客户端怎么发，服务端就应该怎么收；
+  - 客户端如果没有消息，服务端会进入堵塞等待；
+  - Socket一方关闭或者出现异常，对方Socket也会失效或者出错；
+
+- 具体代码：
+
+  ```java
+      System.out.println("======服务端启动成功======");
+      //1、
+      ServerSocket serverSocket = new ServerSocket(7777);
+      //定义一个死循环由主线程不断地接收客户的Socket管道
+      while (true) {
+          //2、每接收到客户端的Socket管道，交给一个独立的子线程负责读取消息
+          Socket socket = serverSocket.accept();
+          System.out.println(socket.getRemoteSocketAddress()+"上线了！！！");
+          //创建一个线程对象
+          new Thread(
+                  () -> {
+                      try {
+                          //3、
+                          InputStream is = socket.getInputStream();
+                          //4、
+                          BufferedReader br = new BufferedReader(new InputStreamReader(is));
+                          //5、
+                          String msg;
+                          while ((msg = br.readLine()) != null) {
+                              System.out.println(socket.getRemoteSocketAddress() + "说了：" + msg);
+                          }
+                      } catch (Exception e) {
+                          System.out.println(socket.getRemoteSocketAddress() + "下线了~~~");
+                      }
+                  }
+          ).start();
+      }
+  ```
+  
+  ```java
+      System.out.println("=======启动客户端======");
+      //1、创建Socket通信管道请求服务器的连接
+      Socket socket = new Socket("127.0.0.1", 7777);
+  
+      //2、从socket通信管道中得到一个字节输出流得到数据
+      OutputStream os = socket.getOutputStream();
+  
+      //3、把低级的字节流包装成打印流
+      PrintStream ps = new PrintStream(os);
+      Scanner sc = new Scanner(System.in);
+  
+      //4、发送消息
+      while (true) {
+          if ("exit".equals(sc.nextLine())) {
+              break;
+          }
+          System.out.println("请说：~~");
+          ps.println(sc.nextLine());
+          ps.flush();//刷新
+      }
+  ```
+  
+
+### 1.2.4即时通讯
+
+- 即时通讯，是指一个客户端的消息发出去，其他客户端可以接收到
+- 即时通讯需要进行端口转发的设计思想
+- 服务端需要把在线的Socket管道存储起来
+- 一旦收到消息要把消息推送给其他管道
+
+
+
+### 1.2.5模拟BS
+
+>代码如下：
+
+```java 
+//服务端
+package com.yxyl.d10_ds;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.util.concurrent.*;
+
+public class BSserverDemo {
+    // 使用静态变量记住一个线程池对象
+    private static ExecutorService pool = new ThreadPoolExecutor(3, 5, 6, TimeUnit.SECONDS,
+            new ArrayBlockingQueue<>(2),
+            Executors.defaultThreadFactory(),
+            new ThreadPoolExecutor.AbortPolicy());
+
+    public static void main(String[] args) throws Exception {
+        //注册一个端口
+        ServerSocket ss = new ServerSocket(8080);
+
+        try {
+            //while循环接收浏览器的请求
+            while (true) {
+                Socket socket = ss.accept();
+                //交给一个独立线程来处理
+                pool.execute(new ServerReaderRunnable(socket));
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}
+```
+
+```java
+//ServerReaderRunnable类
+package com.yxyl.d10_ds;
+import java.io.PrintStream;
+import java.net.Socket;
+
+public class ServerReaderRunnable implements Runnable {
+
+    private Socket socket;
+
+    public ServerReaderRunnable(Socket socket) {
+        this.socket = socket;
+    }
+
+    @Override
+    public void run() {
+        try {
+            //浏览器 已经与本线程简历了Socket管道
+            //响应消息给浏览器显示
+            PrintStream ps = new PrintStream(socket.getOutputStream());
+            //必须响应HTTP协议格式数据，否则浏览器不认识消息
+            ps.println("HTTP/1.1 200 OK");//协议类型和版本，响应成功的消息！
+            ps.println("Content-Type:text/html;charset=UTF-8");//响应数据类型：文本/网页
+            //必须发一行空行
+            //才可以响应数据回去给浏览器
+            ps.println();
+            ps.println("<span style='color:red;font-size:90px'>《最牛的149期》</span>");
+            ps.close();
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}
+```
 
 
 
