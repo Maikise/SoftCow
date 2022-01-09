@@ -853,6 +853,94 @@ public class ServerReaderRunnable implements Runnable {
 
 - **通用框架的底层原理**
 
+  ​		保存任意对象到文件夹：
+
+  - ```java
+    /*
+        保存任意对象
+     */
+    public static void save(Object obj) {
+        try (PrintStream ps = new PrintStream(new FileOutputStream("data.txt", true))
+        ) {
+            //提取对象全部成员变量
+            Class c = obj.getClass();//c.getSimpleName()获取类名
+            ps.println("==========" + c.getSimpleName() + "=========");
+            Field[] fields = c.getDeclaredFields();
+    
+            //获取成员变量的信息
+            for (Field field : fields) {
+                String name = field.getName();
+                //(取值)
+                field.setAccessible(true);
+                String value = field.get(obj) + "";
+                ps.println(name + "=" + value);
+            }
+    
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+    ```
+
+- **动态代理** ->[详细点这里](https://blog.csdn.net/weixin_43438052/article/details/117292687?ops_request_misc=%257B%2522request%255Fid%2522%253A%2522164172376316781683959885%2522%252C%2522scm%2522%253A%252220140713.130102334.pc%255Fall.%2522%257D&request_id=164172376316781683959885&biz_id=0&utm_medium=distribute.pc_search_result.none-task-blog-2~all~first_rank_ecpm_v1~rank_v31_ecpm-14-117292687.pc_search_insert_ulrmf&utm_term=Java%E5%8A%A8%E6%80%81%E4%BB%A3%E7%90%86%E9%87%8D%E8%A6%81%E5%90%97&spm=1018.2226.3001.4187)
+
+> **第一步定义一个接口**
+>
+> 在接口里定义一个helloworld();
+
+```java
+/**
+ * @Description 代理测试接口
+ */
+public interface MyIntf {
+	void helloWorld();
+}
+```
+
+>**第二步，编写一个我们自己的调用处理类**，
+>
+>这个类需要实现`InvocationHandler`接口`InvocationHandler`接口只有一个待实现的`invoke()`方法。
+>这个方法有三个参数：
+>
+>- `proxy`表示动态代理类实例
+>- `method`表示调用的方法
+>- `args`表示调用方法的参数
+>
+>在实际应用中，`invoke()`方法就是我们实现业务逻辑的入口。
+
+```java 
+/**
+ * @Description 目标类
+ */
+public class MyInvocationHandler implements InvocationHandler {
+    @Override
+    public Object invoke(Object proxy, Method method, Object[] args)throws Throwable {
+    	System.out.println(method);
+    	return null;
+     }
+}
+```
+
+>**第三步，直接使用`Proxy`提供的方法创建一个`动态代理类实例`。**
+>并调用代理类实例的`helloWorld()`方法，检测运行结果
+
+```java
+/**
+ * @Description JDK动态代理测试类
+ */
+public class ProxyTest{
+    public static void main(String[] args){
+    	System.getProperties().put("sun.misc.ProxyGenerator.saveGeneratedFiles","true");
+    	MyIntf proxyObj = (MyIntf)Proxy
+            .newProxyInstance(MyIntf.class.getClassLoader(),
+                              new Class[]{MyIntf.class},
+                              new MyInvocationHandler());
+     	proxyObj.helloWorld();
+     }
+}
+```
+
+
 
 
 
